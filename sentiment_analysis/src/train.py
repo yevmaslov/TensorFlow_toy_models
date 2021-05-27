@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from tensorflow.keras.layers import Embedding, LSTM, Bidirectional, Dense
+from tensorflow.keras.layers import Embedding, LSTM, Bidirectional, Dense, Conv1D, MaxPooling1D, Flatten, Dropout
 from src.encoder import DataPreprocessor
 from src.download_data import download_dataset
 import os
@@ -14,7 +14,7 @@ GLOVE_FN = 'glove.6B.50d.txt'
 GLOVE_FILE_PATH = os.path.join(GLOVE_PATH, GLOVE_FN)
 
 MODELS_PATH = '../models'
-MODEL_NAME = 'BiLSTM_with_GloVe_embeddings'
+MODEL_NAME = 'CNN' # ['CNN', 'BiLSTM_with_GloVe_embeddings', ]
 MODEL_SAVE_PATH = os.path.join(MODELS_PATH, MODEL_NAME)
 
 
@@ -62,7 +62,47 @@ def build_model_bilstm(vocab_size, embedding_dim, rnn_units, embedding_matrix, t
         Bidirectional(LSTM(rnn_units, dropout=0.25)),
         Dense(1, activation='sigmoid')
     ])
+
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'Precision', 'Recall'])
     return model
+
+
+def build_model_cnn(max_len, embedding_dims, vocab_size):
+
+    model = tf.keras.Sequential([
+        Embedding(vocab_size, embedding_dims,
+                  input_length=max_len, mask_zero=True),
+        Conv1D(256, 3, padding='valid',
+               activation='relu', strides=1),
+        MaxPooling1D(2),
+        Flatten(),
+        Dense(256, activation='relu'),
+        Dropout(0.2),
+        Dense(1, activation='sigmoid')
+    ])
+
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'Precision', 'Recall'])
+    return model
+
+
+def preprocess_for_cnn(encoded_train, encoded_test):
+    x_train, y_train = [], []
+    for sample in encoded_train:
+        x_train.append(sample[0].numpy())
+        y_train.append(sample[1].numpy())
+
+    x_train = np.array(x_train)
+    y_train = np.array(y_train)
+
+    x_valid, y_valid = [], []
+    for sample in encoded_test:
+        x_valid.append(sample[0].numpy())
+        y_valid.append(sample[1].numpy())
+
+    x_valid = np.array(x_train)
+    y_valid = np.array(y_train)
+
+    return x_train, y_train, x_valid, y_valid
 
 
 def main():
@@ -77,19 +117,30 @@ def main():
     embedding_matrix, _, _ = get_embedding_matrix(tfds_encoder, glove_w2v, embedding_dim)
 
     rnn_units = 64
-    model_fe = build_model_bilstm(
-        vocab_size=tfds_encoder.vocab_size,
-        embedding_dim=embedding_dim,
-        rnn_units=rnn_units,
-        embedding_matrix=embedding_matrix)
-    model_fe.summary()
 
-    model_fe.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'Precision', 'Recall'])
+    if MODEL_NAME == 'BiLSTM_with_GloVe_embeddings':
+        model = build_model_bilstm(
+            vocab_size=tfds_encoder.vocab_size,
+            embedding_dim=embedding_dim,
+            rnn_units=rnn_units,
+            embedding_matrix=embedding_matrix)
+        model.summary()
 
-    encoded_train_batched = encoded_train.batch(BATCH_SIZE).prefetch(100)
-    history = model_fe.fit(encoded_train_batched, epochs=1)
+        encoded_train_batched = encoded_train.batch(BATCH_SIZE).prefetch(100)
+        history = model.fit(encoded_train_batched, epochs=1)
 
-    save_model(model_fe,
+    elif MODEL_NAME == 'CNN':
+        x_train, y_train, x_valid, y_valid = preprocess_for_cnn(encoded_train, encoded_test)
+
+        model = build_model_cnn(max_len=150, embedding_dims=50, vocab_size=tfds_encoder.vocab_size)
+
+        model.summary()
+        history = model.fit(x_train, y_train,
+                            batch_size=BATCH_SIZE,
+                            epochs=1,
+                            validation_data=(x_valid, y_valid))
+
+    save_model(model,
                history,
                MODEL_SAVE_PATH,
                MODEL_NAME)
