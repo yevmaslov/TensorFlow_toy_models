@@ -1,0 +1,6 @@
+numpy==1.18.5
+tensorflow
+tensorflow_datasets
+pandas
+nltk
+nlpia
