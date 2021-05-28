@@ -3,4 +3,5 @@ tensorflow
 tensorflow_datasets
 pandas
 nltk
-nlpia
+transformers==3.0.2
+sklearn
