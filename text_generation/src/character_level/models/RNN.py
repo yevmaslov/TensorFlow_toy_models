@@ -113,17 +113,19 @@ def train_model(data_path, epochs, batch_size, callbacks, debug=False):
 
 def restore_model(checkpoint_dir, batch_size=1):
     chars = get_token_list()
-    char2idx, idx2char = get_char2idx_dict(chars)
+
     vocab_size = len(chars)
 
     model = build_gen_model(vocab_size, batch_size)
     model.load_weights(tf.train.latest_checkpoint(checkpoint_dir))
     model.build(tf.TensorShape([1, None]))
 
-    return model, char2idx, idx2char
+    return model
 
 
-def generate_text_greedy(model, start_string, char2idx, idx2char, temperature=0.7, num_generate=75):
+def generate_text_greedy(model, start_string, temperature=0.7, num_generate=75):
+    chars = get_token_list()
+    char2idx, idx2char = get_char2idx_dict(chars)
 
     input_eval = [char2idx[s] for s in start_string]
     input_eval = tf.expand_dims(input_eval, 0)
