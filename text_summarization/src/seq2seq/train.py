@@ -1,24 +1,16 @@
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import os
-from src.models import seq2seq as s2s
+from src.seq2seq import seq2seq as s2s
 import datetime
 import time
 
-DATA_PATH = '../data'
-MODELS_PATH = '../models'
-ENCODER_NAME = 'encoder'
-DECODER_NAME = 'decoder'
-ENCODER_SAVE_PATH = os.path.join(MODELS_PATH, ENCODER_NAME)
-DECODER_SAVE_PATH = os.path.join(MODELS_PATH, DECODER_NAME)
+DATA_PATH = '../../data'
+MODELS_PATH = '../../models'
 
-BUFFER_SIZE = 1500000
+BUFFER_SIZE = 64
 BATCH_SIZE = 64
 EPOCHS = 3
-
-START = None
-END = None
-TOKENIZER = None
 
 CHECKPOINT = None
 
@@ -34,7 +26,7 @@ def load_data():
     return ds_train, ds_val, ds_test
 
 
-def get_tokenizer(data, file="gigaword32k.enc"):
+def get_tokenizer(data, file="../gigaword32k.enc"):
     if os.path.exists(file+'.subwords'):
         tokenizer = tfds.deprecated.text.SubwordTextEncoder.load_from_file(file)
     else:
@@ -45,34 +37,6 @@ def get_tokenizer(data, file="gigaword32k.enc"):
         tokenizer.save_to_file(file)
 
     return tokenizer
-
-
-# def encode(article, summary, start, end,
-#            tokenizer, art_max_len=128, smry_max_len=50):
-#
-#     tokens = tokenizer.encode(article.numpy())
-#     if len(tokens) > art_max_len:
-#         tokens = tokens[:art_max_len]
-#     art_enc = sequence.pad_sequences([tokens], padding='post',
-#                                      maxlen=art_max_len).squeeze()
-#
-#     tokens = [start] + tokenizer.encode(summary.numpy())
-#     if len(tokens) > smry_max_len:
-#         tokens = tokens[:smry_max_len]
-#     else:
-#         tokens = tokens + [end]
-#
-#     smry_enc = sequence.pad_sequences([tokens], padding='post',
-#                                       maxlen=smry_max_len).squeeze()
-#     return art_enc, smry_enc
-#
-#
-# def tf_encode(article, summary):
-#     art_enc, smry_enc = tf.py_function(encode, [article, summary],
-#                                        [tf.int64, tf.int64])
-#     art_enc.set_shape([None])
-#     smry_enc.set_shape([None])
-#     return art_enc, smry_enc
 
 
 @tf.function
@@ -102,20 +66,6 @@ def train_step(encoder, decoder, inp, targ, enc_hidden, optimizer, start, max_gr
 
     optimizer.apply_gradients(zip(clipped_gradients, variables))
     return batch_loss
-
-
-# loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-#                     from_logits=False, reduction='none')
-#
-#
-# def loss_function(real, pred):
-#     mask = tf.math.logical_not(tf.math.equal(real, 0))
-#     loss_ = loss_object(real, pred)
-#
-#     mask = tf.cast(mask, dtype=loss_.dtype)
-#     loss_ *= mask
-#
-#     return tf.reduce_mean(loss_)
 
 
 def main():
@@ -148,11 +98,14 @@ def main():
         staircase=False)
     optimizer = tf.keras.optimizers.Adam(lr_schedule)
 
-    checkpoint_dir = os.path.join(DATA_PATH, 'checkpoints')
+    checkpoint_dir = os.path.join(MODELS_PATH, 'checkpoints_seq2seq')
+    if not os.path.isdir(checkpoint_dir):
+        os.mkdir(checkpoint_dir)
     checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
     checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                      encoder=encoder,
                                      decoder=decoder)
+
     if CHECKPOINT is not None:
         chkpt_status = checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
         chkpt_status.assert_existing_objects_matched()

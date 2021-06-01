@@ -112,7 +112,7 @@ def loss_function(real, pred):
     return tf.reduce_mean(loss_)
 
 
-tokenizer = tfds.deprecated.text.SubwordTextEncoder.load_from_file("gigaword32k.enc")
+tokenizer = tfds.deprecated.text.SubwordTextEncoder.load_from_file("../gigaword32k.enc")
 start = tokenizer.vocab_size + 1
 end = tokenizer.vocab_size
 
