@@ -10,6 +10,8 @@ import numpy as np
 
 DATA_PATH = '../data'
 SAVE_PATH = os.path.join(DATA_PATH, 'features')
+TRAIN_LEN = 15000  # or None for full
+VALID_LEN = 15000  # or None for full
 
 
 def preprocess_json():
@@ -23,10 +25,17 @@ def preprocess_json():
     train_prefix = os.path.join(DATA_PATH, 'train2014/')
     valid_prefix = os.path.join(DATA_PATH, 'val2014/')
 
-    valid_set = len(valid_captions['images']) - 5000
-    train_images = {x['id']: x['file_name'] for x in train_captions['images']}
+    valid_set = len(valid_captions['images'])
+    train_set = len(train_captions['images'])
+
+    if TRAIN_LEN:
+        train_set = TRAIN_LEN
+    if VALID_LEN:
+        valid_set = VALID_LEN
+
+    train_images = {x['id']: x['file_name'] for x in train_captions['images'][:train_set]}
     valid_images = {x['id']: x['file_name'] for x in valid_captions['images'][:valid_set]}
-    true_valid_images = {x['id']: x['file_name'] for x in valid_captions['images'][valid_set:]}
+    true_valid_images = {x['id']: x['file_name'] for x in valid_captions['images'][valid_set:valid_set+5000]}
 
     data = list()
     errors = list()
@@ -89,7 +98,6 @@ def preprocess_images():
     hidden_layer = resnet50.layers[-1].output
 
     features_extractor = tf.keras.Model(new_input, hidden_layer)
-    features_extractor.summary()
 
     if not os.path.isdir(SAVE_PATH):
         os.makedirs(SAVE_PATH)
@@ -120,12 +128,8 @@ def preprocess_annotations():
 
 
 def main():
-
-    if not (os.path.isfile(os.path.join(DATA_PATH, 'train.csv')) and
-            os.path.isfile(os.path.join(DATA_PATH, 'valid.csv'))):
-        print('JSON preprocessing...')
-        preprocess_json()
-
+    print('JSON preprocessing...')
+    preprocess_json()
     print('Images preprocessing...')
     preprocess_images()
     print('Captions preprocessing...')
